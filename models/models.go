@@ -27,6 +27,12 @@ type CommandMessage struct {
 	Action   string `json:"action"` // "start" или "stop"
 }
 
+type WebAuthConfig struct {
+    Username string `json:"username"`
+    Password string `json:"password"`
+}
+
 type WebConfig struct {
-    Port    string
+    Port string        `json:"port"`
+    Auth WebAuthConfig `json:"auth"`
 }

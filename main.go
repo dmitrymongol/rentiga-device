@@ -29,6 +29,10 @@ func main() {
         },
 		Web: models.WebConfig{
 			Port: ":8888",
+			Auth: models.WebAuthConfig{
+				Username: "admin",
+				Password: "secret",
+			},
 		},
     }
 
@@ -41,7 +45,12 @@ func main() {
 
 	application := app.New(cfg, rabbit)
 
-	webServer := &web.WebServer{App: application}
+	webServer := &web.WebServer{
+		App:      application,
+		Username: cfg.Web.Auth.Username,
+		Password: cfg.Web.Auth.Password,
+	}
+
 	go webServer.Start(cfg.Web.Port)
 
 	go application.StartCommandConsumer()

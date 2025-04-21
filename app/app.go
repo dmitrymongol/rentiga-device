@@ -14,7 +14,10 @@ import (
 	"rentiga-device/rabbitmq"
 	"rentiga-device/streaming"
 	"rentiga-device/ui"
+	"sync"
 	"time"
+
+	"github.com/gotk3/gotk3/glib"
 )
 
 type App struct {
@@ -25,6 +28,7 @@ type App struct {
 	stopHeartbeat chan struct{}
 	rabbitClient  *rabbitmq.Client
 	isStreaming bool
+	mu          sync.Mutex
 }
 
 var _ interfaces.Application = (*App)(nil)
@@ -170,14 +174,33 @@ func (a *App) sendHeartbeat() {
 }
 
 func (a *App) StartStream() {
-	if err := a.streamer.Start(); err != nil {
-		log.Printf("Stream start error: %v", err)
-		a.UpdateConnectionStatus(false, "Stream error")
-	}
+    a.mu.Lock()
+    defer a.mu.Unlock()
+    
+    if a.isStreaming {
+        return
+    }
+    
+    if err := a.streamer.Start(); err != nil {
+        log.Printf("Stream start error: %v", err)
+        return
+    }
+    
+    a.isStreaming = true
+    a.UpdateConnectionStatus(true, "Streaming started")
 }
 
 func (a *App) StopStream() {
-	a.streamer.Stop()
+    a.mu.Lock()
+    defer a.mu.Unlock()
+    
+    if !a.isStreaming {
+        return
+    }
+    
+    a.streamer.Stop()
+    a.isStreaming = false
+    a.UpdateConnectionStatus(false, "Streaming stopped")
 }
 
 func (a *App) UpdateConnectionStatus(connected bool, message string) {
@@ -205,21 +228,24 @@ func (a *App) StartCommandConsumer() {
 				continue
 			}
 
-			switch cmd.Action {
-			case "start":
-				a.StartStream()
-			case "stop":
-				a.StopStream()
-			default:
-				log.Printf("Unknown command action: %s", cmd.Action)
-			}
+            glib.IdleAdd(func() {
+                switch cmd.Action {
+                case "start":
+                    a.StartStream()
+                case "stop":
+                    a.StopStream()
+                default:
+                    log.Printf("Unknown command action: %s", cmd.Action)
+                }
+            })
 		}
 	}()
 }
 
 func (a *App) GetStatus() map[string]interface{} {
     return map[string]interface{}{
-        "streaming": a.isStreaming,
-        // Другие параметры статуса
+        "streaming":  a.isStreaming,
+        "connected":  a.certManager != nil && a.certManager.IsLoaded(),
+        "device_id":  a.certManager.Config().DeviceID,
     }
 }
