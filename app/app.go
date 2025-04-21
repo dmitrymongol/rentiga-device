@@ -23,7 +23,8 @@ type App struct {
 	mainWindow    *ui.MainWindow
 	config        *models.AppConfig
 	stopHeartbeat chan struct{}
-	rabbitClient  *rabbitmq.Client // Добавляем RabbitMQ клиент
+	rabbitClient  *rabbitmq.Client
+	isStreaming bool
 }
 
 var _ interfaces.Application = (*App)(nil)
@@ -214,4 +215,11 @@ func (a *App) StartCommandConsumer() {
 			}
 		}
 	}()
+}
+
+func (a *App) GetStatus() map[string]interface{} {
+    return map[string]interface{}{
+        "streaming": a.isStreaming,
+        // Другие параметры статуса
+    }
 }

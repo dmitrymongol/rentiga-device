@@ -3,6 +3,7 @@ package models
 type AppConfig struct {
     Certificate CertificateConfig
     Stream      StreamConfig
+	Web WebConfig
 }
 
 type CertificateConfig struct {
@@ -24,4 +25,8 @@ type StreamConfig struct {
 type CommandMessage struct {
 	DeviceID string `json:"device_id"`
 	Action   string `json:"action"` // "start" или "stop"
+}
+
+type WebConfig struct {
+    Port    string
 }

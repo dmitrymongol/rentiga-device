@@ -5,6 +5,7 @@ import (
 	"rentiga-device/app"
 	"rentiga-device/models"
 	"rentiga-device/rabbitmq"
+	"rentiga-device/web"
 
 	"github.com/gotk3/gotk3/glib"
 	"github.com/gotk3/gotk3/gtk"
@@ -26,6 +27,9 @@ func main() {
             FontPath:   "/usr/share/fonts/...",
             QRPath:    "/tmp/qr.png",
         },
+		Web: models.WebConfig{
+			Port: ":8888",
+		},
     }
 
 	// Инициализация RabbitMQ клиента
@@ -36,6 +40,9 @@ func main() {
 	defer rabbit.Close()
 
 	application := app.New(cfg, rabbit)
+
+	webServer := &web.WebServer{App: application}
+	go webServer.Start(cfg.Web.Port)
 
 	go application.StartCommandConsumer()
 
