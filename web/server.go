@@ -2,6 +2,7 @@ package web
 
 import (
 	"encoding/json"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -43,6 +44,8 @@ func (ws *WebServer) Start(port string) {
                 ws.handleStart(w, r)
             case "/api/stop":
                 ws.handleStop(w, r)
+			case "/api/upload-cert":
+				ws.handleUploadCert(w, r)
             default:
                 http.NotFound(w, r)
             }
@@ -82,8 +85,13 @@ func (ws *WebServer) Start(port string) {
 // Middleware для Basic Auth
 func (ws *WebServer) basicAuthMiddleware(next http.Handler) http.Handler {
     return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Исключаем OPTIONS из проверки авторизации
+		if r.Method == "OPTIONS" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
         user, pass, ok := r.BasicAuth()
-        
         if !ok || user != ws.Username || pass != ws.Password {
             w.Header().Set("WWW-Authenticate", `Basic realm="Restricted", charset="UTF-8"`)
             http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -143,4 +151,65 @@ func respondJSON(w http.ResponseWriter, code int, payload interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	w.Write(response)
+}
+
+// В обработчике handleUploadCert
+func (ws *WebServer) handleUploadCert(w http.ResponseWriter, r *http.Request) {
+    if r.Method != http.MethodPost {
+        respondJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+        return
+    }
+
+    // Создаем временный файл перед обработкой
+    tempFile, err := os.CreateTemp("", "upload-*.zip")
+    if err != nil {
+        log.Printf("Failed to create temp file: %v", err)
+        respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+        return
+    }
+    tempPath := tempFile.Name()
+    defer os.Remove(tempPath)
+
+    // Копируем данные во временный файл
+    if _, err := io.Copy(tempFile, r.Body); err != nil {
+        tempFile.Close()
+        respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to save file"})
+        return
+    }
+    tempFile.Close()
+
+    // Создаем канал для получения результата
+    resultChan := make(chan struct {
+        status int
+        body   interface{}
+        err    error
+    })
+
+    // Обработка в главном потоке GTK
+    glib.IdleAdd(func() {
+        defer close(resultChan)
+        
+        if err := ws.App.LoadCertificate(tempPath); err != nil {
+            resultChan <- struct {
+                status int
+                body   interface{}
+                err    error
+            }{http.StatusBadRequest, nil, err}
+            return
+        }
+        
+        resultChan <- struct {
+            status int
+            body   interface{}
+            err    error
+        }{http.StatusOK, map[string]string{"status": "certificate uploaded"}, nil}
+    })
+
+    // Ждем результат и отправляем ответ
+    result := <-resultChan
+    if result.err != nil {
+        respondJSON(w, result.status, map[string]string{"error": result.err.Error()})
+        return
+    }
+    respondJSON(w, result.status, result.body)
 }

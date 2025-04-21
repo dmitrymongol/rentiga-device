@@ -28,6 +28,7 @@ type App struct {
 	stopHeartbeat chan struct{}
 	rabbitClient  *rabbitmq.Client
 	isStreaming bool
+	isConnected bool
 	mu          sync.Mutex
 }
 
@@ -123,6 +124,7 @@ func (a *App) checkConnection() {
 	switch {
 	case resp.StatusCode == http.StatusOK:
 		a.UpdateConnectionStatus(true, "Connected: "+deviceID)
+		a.isConnected = true;
 		go a.startHeartbeat()
 
 	case resp.StatusCode == http.StatusUnauthorized:
@@ -164,6 +166,7 @@ func (a *App) sendHeartbeat() {
 	resp, err := a.certManager.HTTPClient().Do(req)
 	if err != nil {
 		a.UpdateConnectionStatus(false, "Connection lost")
+		a.isConnected = false;
 		return
 	}
 	defer resp.Body.Close()
@@ -245,7 +248,8 @@ func (a *App) StartCommandConsumer() {
 func (a *App) GetStatus() map[string]interface{} {
     return map[string]interface{}{
         "streaming":  a.isStreaming,
-        "connected":  a.certManager != nil && a.certManager.IsLoaded(),
+        "connected":  a.isConnected,
         "device_id":  a.certManager.Config().DeviceID,
+		"has_certificate": a.HasCertificate(),
     }
 }

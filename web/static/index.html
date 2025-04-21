@@ -7,7 +7,21 @@
   <body>
     <div class="container">
       <h1>Device Control Panel</h1>
-      <div id="status">Status: Loading...</div>
+      <div class="status-row">
+        <div id="connectionStatus" class="status-box">
+          <span class="status-led"></span>
+          <span class="status-text">Connection: Loading...</span>
+        </div>
+        <div id="streamStatus" class="status-box">
+          <span class="status-led"></span>
+          <span class="status-text">Stream: Loading...</span>
+        </div>
+      </div>
+      <!-- Форма загрузки сертификата -->
+      <form id="certForm">
+        <input type="file" id="certInput" name="certificate" accept=".zip" />
+        <button type="submit">Upload Certificate</button>
+      </form>
       <button id="startBtn">Start Stream</button>
       <button id="stopBtn">Stop Stream</button>
     </div>
