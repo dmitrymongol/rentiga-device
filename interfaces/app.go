@@ -6,6 +6,5 @@ type Application interface {
     StartStream()
     StopStream()
     GetConfig() interface{}
-    UpdateConnectionStatus(bool, string)
 	HasCertificate() bool
 }

@@ -23,41 +23,33 @@ import (
 type App struct {
 	certManager   *certificate.Manager
 	streamer      *streaming.Streamer
-	mainWindow    *ui.MainWindow
 	config        *models.AppConfig
 	stopHeartbeat chan struct{}
 	rabbitClient  *rabbitmq.Client
-	isStreaming bool
-	isConnected bool
-	mu          sync.Mutex
+	isStreaming   bool
+	isConnected   bool
+	mu            sync.Mutex
+	mainWindow    *ui.MainWindow
 }
 
 var _ interfaces.Application = (*App)(nil)
 
 func New(cfg *models.AppConfig, rabbit *rabbitmq.Client) *App {
-    return &App{
-        certManager: certificate.NewManager(&cfg.Certificate),
-        streamer:    streaming.NewStreamer(&cfg.Stream, cfg.Certificate.DeviceID),
-        config:      cfg,
+	return &App{
+		certManager:  certificate.NewManager(&cfg.Certificate),
+		streamer:     streaming.NewStreamer(&cfg.Stream, cfg.Certificate.DeviceID),
+		config:       cfg,
 		rabbitClient: rabbit,
-    }
+	}
 }
 
 func (a *App) Initialize() {
-    // Инициализация UI
-    a.mainWindow = ui.NewMainWindow(a)
-    
-    // Загрузка сертификатов и проверка соединения
-    if a.hasSavedCertificate() {
-        if err := a.loadSavedCertificate(); err == nil {
-            log.Println("Loaded saved certificate successfully")
-            a.checkConnection()
-        }
-    }
-}
-
-func (a *App) Start() {
-    a.mainWindow.Window.ShowAll()
+	if a.hasSavedCertificate() {
+		if err := a.loadSavedCertificate(); err == nil {
+			log.Println("Loaded saved certificate successfully")
+			a.checkConnection()
+		}
+	}
 }
 
 func (a *App) GetConfig() interface{} {
@@ -95,42 +87,37 @@ func (a *App) LoadCertificate(zipPath string) error {
     }
     
     a.checkConnection()
-    a.mainWindow.UpdateCertificateButton()
     return nil
 }
 
 func (a *App) checkConnection() {
 	deviceID := a.certManager.Config().DeviceID
 	if deviceID == "" {
-		a.UpdateConnectionStatus(false, "No device ID")
 		return
 	}
 
 	url := fmt.Sprintf("https://localhost:8443/tls/devices/%s/login", deviceID)
 	req, err := http.NewRequest("POST", url, nil)
 	if err != nil {
-		a.UpdateConnectionStatus(false, "Request creation failed")
 		return
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := a.certManager.HTTPClient().Do(req)
 	if err != nil {
-		a.UpdateConnectionStatus(false, "Connection failed")
 		return
 	}
 	defer resp.Body.Close()
 
 	switch {
 	case resp.StatusCode == http.StatusOK:
-		a.UpdateConnectionStatus(true, "Connected: "+deviceID)
 		a.isConnected = true;
 		go a.startHeartbeat()
 
 	case resp.StatusCode == http.StatusUnauthorized:
-		a.UpdateConnectionStatus(false, "Invalid credentials")
+		// a.UpdateConnectionStatus(false, "Invalid credentials")
 	default:
-		a.UpdateConnectionStatus(false, "API error: "+resp.Status)
+		// a.UpdateConnectionStatus(false, "API error: "+resp.Status)
 	}
 }
 
@@ -165,7 +152,6 @@ func (a *App) sendHeartbeat() {
 
 	resp, err := a.certManager.HTTPClient().Do(req)
 	if err != nil {
-		a.UpdateConnectionStatus(false, "Connection lost")
 		a.isConnected = false;
 		return
 	}
@@ -190,7 +176,6 @@ func (a *App) StartStream() {
     }
     
     a.isStreaming = true
-    a.UpdateConnectionStatus(true, "Streaming started")
 }
 
 func (a *App) StopStream() {
@@ -203,13 +188,6 @@ func (a *App) StopStream() {
     
     a.streamer.Stop()
     a.isStreaming = false
-    a.UpdateConnectionStatus(false, "Streaming stopped")
-}
-
-func (a *App) UpdateConnectionStatus(connected bool, message string) {
-	if a.mainWindow != nil {
-		a.mainWindow.UpdateConnectionStatus(connected, message)
-	}
 }
 
 func (a *App) StartCommandConsumer() {
@@ -252,4 +230,15 @@ func (a *App) GetStatus() map[string]interface{} {
         "device_id":  a.certManager.Config().DeviceID,
 		"has_certificate": a.HasCertificate(),
     }
+}
+
+func (a *App) ShowStreamWindow() {
+	a.mainWindow = ui.NewMainWindow()
+	a.mainWindow.Window.ShowAll()
+}
+
+func (a *App) HideStreamWindow() {
+	if a.mainWindow != nil {
+		a.mainWindow.Window.Hide()
+	}
 }

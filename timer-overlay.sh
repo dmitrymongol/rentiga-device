@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Параметры устройства
-DEVICE="/dev/video2"
+DEVICE="/dev/video0"
 RESOLUTION="1920x1080"  # Подберите под ваше устройство
 
 # Запуск FFmpeg с фильтром таймера
