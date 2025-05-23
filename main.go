@@ -7,8 +7,6 @@ import (
 	"rentiga-device/models"
 	"rentiga-device/rabbitmq"
 	"rentiga-device/web"
-
-	"github.com/gotk3/gotk3/gtk"
 )
 
 func main() {
@@ -18,6 +16,8 @@ func main() {
 	defer rabbit.Close()
 
 	application := app.New(cfg, rabbit)
+	application.Initialize() 
+	
 	webServer := &web.WebServer{
 		App:      application,
 		Username: cfg.Web.Auth.Username,
@@ -26,12 +26,9 @@ func main() {
 
 	go webServer.Start(cfg.Web.Port)
 	
-	go application.StartCommandConsumer()
-
-	// Инициализируем GTK только когда нужно показать окно
-	gtk.Init(nil)
-	application.Initialize()
-	gtk.Main()
+	application.StartCommandConsumer()
+	
+	select {}
 }
 
 func loadConfig() *models.AppConfig {

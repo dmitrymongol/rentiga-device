@@ -20,6 +20,7 @@ type StreamConfig struct {
     FontPath    string
     TempDir     string
     QRPath      string
+    ConnectorID string 
 }
 
 type CommandMessage struct {

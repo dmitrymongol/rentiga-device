@@ -13,11 +13,8 @@ import (
 	"rentiga-device/models"
 	"rentiga-device/rabbitmq"
 	"rentiga-device/streaming"
-	"rentiga-device/ui"
 	"sync"
 	"time"
-
-	"github.com/gotk3/gotk3/glib"
 )
 
 type App struct {
@@ -29,7 +26,6 @@ type App struct {
 	isStreaming   bool
 	isConnected   bool
 	mu            sync.Mutex
-	mainWindow    *ui.MainWindow
 }
 
 var _ interfaces.Application = (*App)(nil)
@@ -191,36 +187,34 @@ func (a *App) StopStream() {
 }
 
 func (a *App) StartCommandConsumer() {
-	msgs, err := a.rabbitClient.Consume("stream_commands")
-	if err != nil {
-		log.Fatalf("Failed to start consumer: %v", err)
-	}
+    msgs, err := a.rabbitClient.Consume("stream_commands")
+    if err != nil {
+        log.Fatalf("Failed to start consumer: %v", err)
+    }
 
-	go func() {
-		for msg := range msgs {
-			var cmd models.CommandMessage
-			if err := json.Unmarshal(msg.Body, &cmd); err != nil {
-				log.Printf("Failed to parse command: %v", err)
-				continue
-			}
+    go func() {
+        for msg := range msgs {
+            var cmd models.CommandMessage
+            if err := json.Unmarshal(msg.Body, &cmd); err != nil {
+                log.Printf("Failed to parse command: %v", err)
+                continue
+            }
 
-			// Проверяем, что команда для этого устройства
-			if cmd.DeviceID != a.certManager.Config().DeviceID {
-				continue
-			}
+            if cmd.DeviceID != a.certManager.Config().DeviceID {
+                continue
+            }
 
-            glib.IdleAdd(func() {
-                switch cmd.Action {
-                case "start":
-                    a.StartStream()
-                case "stop":
-                    a.StopStream()
-                default:
-                    log.Printf("Unknown command action: %s", cmd.Action)
-                }
-            })
-		}
-	}()
+            // Убрали glib.IdleAdd
+            switch cmd.Action {
+            case "start":
+                a.StartStream()
+            case "stop":
+                a.StopStream()
+            default:
+                log.Printf("Unknown command action: %s", cmd.Action)
+            }
+        }
+    }()
 }
 
 func (a *App) GetStatus() map[string]interface{} {
@@ -230,15 +224,4 @@ func (a *App) GetStatus() map[string]interface{} {
         "device_id":  a.certManager.Config().DeviceID,
 		"has_certificate": a.HasCertificate(),
     }
-}
-
-func (a *App) ShowStreamWindow() {
-	a.mainWindow = ui.NewMainWindow()
-	a.mainWindow.Window.ShowAll()
-}
-
-func (a *App) HideStreamWindow() {
-	if a.mainWindow != nil {
-		a.mainWindow.Window.Hide()
-	}
 }
