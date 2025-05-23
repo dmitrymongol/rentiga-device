@@ -44,6 +44,7 @@ func loadConfig() *models.AppConfig {
 			Resolution: "1920x1080",
 			FontPath:   "/usr/share/fonts/...",
 			QRPath:     "/tmp/qr.png",
+			ConnectorID: "317",
 		},
 		Web: models.WebConfig{
 			Port: ":8888",
